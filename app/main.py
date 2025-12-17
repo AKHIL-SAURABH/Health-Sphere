@@ -193,34 +193,31 @@ def upload_medical_record(
     user=Depends(require_role("PATIENT")),
     db: Session = Depends(get_db)
 ):
-    # 1️⃣ Get patient
     patient = db.query(Patient).filter(Patient.user_id == user["sub"]).first()
     if not patient:
         raise HTTPException(status_code=400, detail="Patient profile not found")
 
-    # 2️⃣ Ensure uploads directory exists
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     UPLOAD_DIR = os.path.join(BASE_DIR, "..", "uploads")
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-    # 3️⃣ Generate safe unique filename
     filename = f"{uuid.uuid4()}_{file.filename}"
     file_disk_path = os.path.join(UPLOAD_DIR, filename)
 
-    # 4️⃣ Save file to disk
     with open(file_disk_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    # 5️⃣ Save ONLY filename in DB (IMPORTANT FIX)
     record = MedicalRecord(
         patient_id=patient.id,
         record_type=record_type,
-        file_path=filename   # ✅ ONLY filename
+        file_path=f"uploads/{filename}"  # ✅ CRITICAL FIX
     )
+
     db.add(record)
     db.commit()
 
     return {"message": "Medical record uploaded successfully"}
+
 
 
 
