@@ -39,6 +39,15 @@ from .schemas import BedStatusCreate
 from .ml.predictor import predict_xray
 from .models import AIPrediction, AIPredictionResult
 from .schemas import AIPredictionResponse
+from fastapi.staticfiles import StaticFiles
+
+from fastapi import HTTPException, Depends
+from sqlalchemy.orm import Session
+from .models import User, Patient
+from .schemas import UserCreate
+from .database import get_db
+from .auth import hash_password
+
 
 
 Base.metadata.create_all(bind=engine)
@@ -57,6 +66,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
 
 def get_db():
     db = SessionLocal()
@@ -65,12 +76,8 @@ def get_db():
     finally:
         db.close()
 
-from fastapi import HTTPException, Depends
-from sqlalchemy.orm import Session
-from .models import User, Patient
-from .schemas import UserCreate
-from .database import get_db
-from .auth import hash_password
+
+
 
 @app.post("/auth/register")
 def register(user: UserCreate, db: Session = Depends(get_db)):
@@ -208,19 +215,34 @@ def upload_medical_record(
     return {"message": "Medical record uploaded"}
 
 
-@app.get("/medvault/my-records", response_model=list[MedicalRecordResponse])
-def get_my_records(
+@app.get("/medvault/records")
+def get_medical_records(
     user=Depends(require_role("PATIENT")),
     db: Session = Depends(get_db)
 ):
-    patient = db.query(Patient).filter(Patient.user_id == user["sub"]).first()
+    patient = db.query(Patient).filter(
+        Patient.user_id == user["sub"]
+    ).first()
+
     if not patient:
         raise HTTPException(status_code=400, detail="Patient profile not found")
 
-    return db.query(MedicalRecord).filter(
-        MedicalRecord.patient_id == patient.id
-    ).all()
+    records = (
+        db.query(MedicalRecord)
+        .filter(MedicalRecord.patient_id == patient.id)
+        .order_by(MedicalRecord.created_at.desc())
+        .all()
+    )
 
+    return [
+        {
+            "id": r.id,
+            "record_type": r.record_type,
+            "file_path": r.file_path,
+            "created_at": r.created_at,
+        }
+        for r in records
+    ]
 
 @app.post("/admin/bed-status")
 def update_bed_status(
