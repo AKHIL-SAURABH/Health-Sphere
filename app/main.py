@@ -65,11 +65,20 @@ def get_db():
     finally:
         db.close()
 
+from fastapi import HTTPException, Depends
+from sqlalchemy.orm import Session
+from .models import User, Patient
+from .schemas import UserCreate
+from .database import get_db
+from .auth import hash_password
+
 @app.post("/auth/register")
 def register(user: UserCreate, db: Session = Depends(get_db)):
+    # 1️⃣ Check if email already exists
     if db.query(User).filter(User.email == user.email).first():
         raise HTTPException(status_code=400, detail="Email already exists")
 
+    # 2️⃣ Create user
     new_user = User(
         name=user.name,
         email=user.email,
@@ -78,8 +87,22 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     )
     db.add(new_user)
     db.commit()
-    db.refresh(new_user)
+    db.refresh(new_user)   # ✅ user.id now exists
+
+    # 3️⃣ AUTO-CREATE PATIENT PROFILE (IMPORTANT)
+    if new_user.role == "PATIENT":
+        patient = Patient(
+            user_id=new_user.id,
+            age="",
+            gender="",
+            contact_number=""
+        )
+        db.add(patient)
+        db.commit()
+
+    # 4️⃣ Return response
     return {"message": "User registered successfully"}
+
 
 @app.post("/auth/login", response_model=Token)
 def login(user: UserLogin, db: Session = Depends(get_db)):
