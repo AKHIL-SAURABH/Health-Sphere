@@ -3,6 +3,8 @@ from fastapi import UploadFile, File
 import shutil
 import os
 from .models import MedicalRecord
+from fastapi.middleware.cors import CORSMiddleware
+
 
 
 from fastapi import FastAPI, Depends, HTTPException
@@ -43,6 +45,18 @@ Base.metadata.create_all(bind=engine)
 
 
 app = FastAPI(title="HealthSphere API")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",              # local frontend
+        "https://health-sphere-c2a3.onrender.com",  # backend itself
+        # you can add vercel URL later
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],   # IMPORTANT: enables OPTIONS
+    allow_headers=["*"],
+)
+
 
 def get_db():
     db = SessionLocal()
