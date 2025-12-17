@@ -41,6 +41,7 @@ from .schemas import AIPredictionResponse
 
 Base.metadata.create_all(bind=engine)
 
+
 app = FastAPI(title="HealthSphere API")
 
 def get_db():
@@ -243,6 +244,7 @@ def healthai_predict(
         )
 
     db.commit()
+
 
     return {
         "prediction_id": prediction.id,
