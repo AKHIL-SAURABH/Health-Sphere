@@ -84,11 +84,24 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 @app.post("/auth/login", response_model=Token)
 def login(user: UserLogin, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.email == user.email).first()
+
     if not db_user or not verify_password(user.password, db_user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    token = create_access_token({"sub": str(db_user.id), "role": db_user.role})
-    return {"access_token": token, "token_type": "bearer"}
+    access_token = create_access_token(
+        {"sub": str(db_user.id), "role": db_user.role}
+    )
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": db_user.id,
+            "name": db_user.name,
+            "email": db_user.email,
+            "role": db_user.role,
+        },
+    }
 
 @app.post("/patients/profile")
 def create_patient_profile(
