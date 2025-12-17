@@ -11,3 +11,4 @@ numpy
 pillow
 opencv-python
 email-validator
+python-dotenv
