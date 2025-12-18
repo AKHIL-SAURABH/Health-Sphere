@@ -336,28 +336,39 @@ def healthai_predict(
     user=Depends(require_role("PATIENT")),
     db: Session = Depends(get_db)
 ):
-    patient = db.query(Patient).filter(Patient.user_id == user["sub"]).first()
+    # 1️⃣ Find patient
+    patient = db.query(Patient).filter(
+        Patient.user_id == user["sub"]
+    ).first()
+
     if not patient:
         raise HTTPException(status_code=400, detail="Patient profile not found")
 
-    os.makedirs("uploads", exist_ok=True)
-    image_path = f"uploads/{uuid.uuid4()}_{file.filename}"
+    # 2️⃣ Save X-ray
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    UPLOAD_DIR = os.path.join(BASE_DIR, "..", "uploads", "xray")
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+    filename = f"{uuid.uuid4()}_{file.filename}"
+    image_path = os.path.join(UPLOAD_DIR, filename)
 
     with open(image_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
+    # 3️⃣ Create AI prediction entry
     prediction = AIPrediction(
         patient_id=patient.id,
-        image_path=image_path
+        image_path=f"uploads/xray/{filename}",
+        doctor_verified="NO"
     )
     db.add(prediction)
     db.commit()
     db.refresh(prediction)
 
-    # 🔥 REAL HealthAI output
+    # 4️⃣ Run AI model
     ai_output = predict_xray(image_path)
 
-    # Store only top-3 in DB
+    # 5️⃣ Store TOP-3 predictions
     for res in ai_output["top_3"]:
         db.add(
             AIPredictionResult(
@@ -369,11 +380,12 @@ def healthai_predict(
 
     db.commit()
 
-
+    # 6️⃣ Return structured response
     return {
         "prediction_id": prediction.id,
         "results": ai_output["top_3"],
         "all_probabilities": ai_output["all_predictions"],
+        "doctor_verified": "NO",
         "note": "AI-assisted prediction. Doctor verification required."
     }
 
