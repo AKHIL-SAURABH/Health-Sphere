@@ -440,6 +440,7 @@ def get_pending_predictions(
 def verify_prediction(
     prediction_id: str,
     action: str,  # VERIFIED or REJECTED
+    notes: str = "",
     user=Depends(require_role("DOCTOR")),
     db: Session = Depends(get_db)
 ):
@@ -453,9 +454,10 @@ def verify_prediction(
     if not prediction:
         raise HTTPException(status_code=404, detail="Prediction not found")
 
-    prediction.doctor_verified = action
-    prediction.verified_by = user["sub"]
-    prediction.verified_at = datetime.utcnow()
+    prediction.doctor_verified = (
+        "YES" if action == "VERIFIED" else "REJECTED"
+    )
+    prediction.doctor_notes = notes
 
     db.commit()
 
@@ -464,3 +466,39 @@ def verify_prediction(
     }
 
 
+@app.get("/healthai/my-predictions")
+def get_my_healthai_predictions(
+    user=Depends(require_role("PATIENT")),
+    db: Session = Depends(get_db)
+):
+    patient = db.query(Patient).filter(
+        Patient.user_id == user["sub"]
+    ).first()
+
+    if not patient:
+        raise HTTPException(status_code=400, detail="Patient profile not found")
+
+    predictions = (
+        db.query(AIPrediction)
+        .filter(AIPrediction.patient_id == patient.id)
+        .order_by(AIPrediction.created_at.desc())
+        .all()
+    )
+
+    response = []
+    for p in predictions:
+        response.append({
+            "prediction_id": p.id,
+            "image_path": p.image_path,
+            "doctor_verified": p.doctor_verified,
+            "results": [
+                {
+                    "disease": r.disease_name,
+                    "confidence": float(r.confidence_score)
+                }
+                for r in p.results
+            ],
+            "created_at": p.created_at
+        })
+
+    return response

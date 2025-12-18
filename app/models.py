@@ -113,15 +113,23 @@ class AIPrediction(Base):
     patient_id = Column(String, ForeignKey("patients.id"), nullable=False)
     image_path = Column(String, nullable=False)
 
-    doctor_verified = Column(String, default="PENDING")  
-    # PENDING | VERIFIED | REJECTED
+    # 🔍 Doctor verification status
+    doctor_verified = Column(String, default="NO")  # NO / VERIFIED / REJECTED
+    doctor_notes = Column(String, nullable=True)
 
+    # 👨‍⚕️ Doctor audit trail
     verified_by = Column(String, ForeignKey("users.id"), nullable=True)
     verified_at = Column(DateTime, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    results = relationship("AIPredictionResult", back_populates="prediction")
+    # 🔗 Relationships
+    results = relationship(
+        "AIPredictionResult",
+        back_populates="prediction",
+        cascade="all, delete"
+    )
+
 
 
 
