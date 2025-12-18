@@ -224,25 +224,6 @@ def update_user_role(
 
     return {"message": f"Role updated to {role}"}
 
-@app.post("/admin/change-role/{user_id}")
-def change_user_role(
-    user_id: str,
-    role: str,  # PATIENT | DOCTOR | ADMIN
-    admin=Depends(require_role("ADMIN")),
-    db: Session = Depends(get_db)
-):
-    if role not in ["PATIENT", "DOCTOR", "ADMIN"]:
-        raise HTTPException(status_code=400, detail="Invalid role")
-
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    user.role = role
-    db.commit()
-
-    return {"message": f"Role updated to {role}"}
-
 
 @app.post("/appointments/book")
 def book_appointment(
@@ -605,6 +586,6 @@ def admin_stats(
         "doctors": db.query(User).filter(User.role == "DOCTOR").count(),
         "ai_predictions": db.query(AIPrediction).count(),
         "verified_predictions": db.query(AIPrediction)
-            .filter(AIPrediction.doctor_verified == "YES")
+            .filter(AIPrediction.doctor_verified == "VERIFIED")
             .count()
     }
