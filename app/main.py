@@ -547,6 +547,34 @@ def get_my_healthai_predictions(
 
     return response
 
+
+@app.get("/admin/healthai/predictions")
+def get_all_predictions(
+    admin=Depends(require_role("ADMIN")),
+    db: Session = Depends(get_db)
+):
+    predictions = db.query(AIPrediction).all()
+
+    return [
+        {
+            "prediction_id": p.id,
+            "patient_id": p.patient_id,
+            "image_path": p.image_path,
+            "doctor_verified": p.doctor_verified,
+            "doctor_notes": p.doctor_notes,
+            "created_at": p.created_at,
+            "results": [
+                {
+                    "disease": r.disease_name,
+                    "confidence": float(r.confidence_score)
+                }
+                for r in p.results
+            ]
+        }
+        for p in predictions
+    ]
+
+
 @app.get("/admin/stats")
 def admin_stats(
     admin=Depends(require_role("ADMIN")),
