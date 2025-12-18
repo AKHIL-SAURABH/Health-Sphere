@@ -47,6 +47,8 @@ from .models import User, Patient
 from .schemas import UserCreate
 from .database import get_db
 from .auth import hash_password
+from .core.security import get_current_user
+
 
 
 
@@ -134,6 +136,25 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
             "role": db_user.role,
         },
     }
+
+@app.get("/auth/me")
+def get_me(user=Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Returns currently logged-in user's full profile
+    """
+
+    db_user = db.query(User).filter(User.id == user["sub"]).first()
+
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {
+        "id": db_user.id,
+        "name": db_user.name,
+        "email": db_user.email,
+        "role": db_user.role,
+    }
+
 
 @app.post("/patients/profile")
 def create_patient_profile(
@@ -249,6 +270,30 @@ def get_medical_records(
         }
         for r in records
     ]
+
+@app.get("/medvault/doctor/records")
+def doctor_view_records(
+    patient_id: str,
+    user=Depends(require_role("DOCTOR")),
+    db: Session = Depends(get_db)
+):
+    records = (
+        db.query(MedicalRecord)
+        .filter(MedicalRecord.patient_id == patient_id)
+        .order_by(MedicalRecord.created_at.desc())
+        .all()
+    )
+
+    return [
+        {
+            "id": r.id,
+            "record_type": r.record_type,
+            "file_path": r.file_path,
+            "created_at": r.created_at,
+        }
+        for r in records
+    ]
+
 
 @app.post("/admin/bed-status")
 def update_bed_status(
