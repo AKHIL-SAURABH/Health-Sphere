@@ -89,12 +89,13 @@ class AIPredictionDoctorView(BaseModel):
     prediction_id: str
     image_path: str
     results: List[AIPredictionResultSchema]
-
     doctor_verified: str
     doctor_notes: Optional[str]
-
+    verified_by: Optional[str]
+    verified_at: Optional[datetime]
     created_at: datetime
 
     class Config:
         from_attributes = True
+
 

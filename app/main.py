@@ -39,6 +39,7 @@ from .schemas import BedStatusCreate
 from .ml.predictor import predict_xray
 from .models import AIPrediction, AIPredictionResult
 from .schemas import AIPredictionResponse
+from .schemas import AIPredictionDoctorView
 from fastapi.staticfiles import StaticFiles
 
 from fastapi import HTTPException, Depends
@@ -48,7 +49,7 @@ from .schemas import UserCreate
 from .database import get_db
 from .auth import hash_password
 from .core.security import get_current_user
-
+from typing import List
 
 
 
@@ -408,33 +409,22 @@ def verify_ai_prediction(
 
     return {"message": "Prediction verified by doctor"}
 
-@app.get("/healthai/pending")
+
+
+@app.get("/healthai/pending", response_model=List[AIPredictionDoctorView])
 def get_pending_predictions(
     user=Depends(require_role("DOCTOR")),
     db: Session = Depends(get_db)
 ):
     predictions = (
         db.query(AIPrediction)
-        .filter(AIPrediction.doctor_verified == "PENDING")
+        .filter(AIPrediction.doctor_verified == "NO")
+        .order_by(AIPrediction.created_at.desc())
         .all()
     )
 
-    response = []
-    for p in predictions:
-        response.append({
-            "prediction_id": p.id,
-            "image_path": p.image_path,
-            "created_at": p.created_at,
-            "results": [
-                {
-                    "disease": r.disease_name,
-                    "confidence": float(r.confidence_score)
-                }
-                for r in p.results
-            ]
-        })
+    return predictions
 
-    return response
 
 @app.post("/healthai/verify/{prediction_id}")
 def verify_prediction(
