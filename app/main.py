@@ -273,13 +273,13 @@ def get_medical_records(
 
 @app.get("/medvault/doctor/records")
 def doctor_view_records(
-    patient_id: str,
     user=Depends(require_role("DOCTOR")),
     db: Session = Depends(get_db)
 ):
     records = (
         db.query(MedicalRecord)
-        .filter(MedicalRecord.patient_id == patient_id)
+        .join(Patient)
+        .join(User, Patient.user_id == User.id)
         .order_by(MedicalRecord.created_at.desc())
         .all()
     )
@@ -290,6 +290,7 @@ def doctor_view_records(
             "record_type": r.record_type,
             "file_path": r.file_path,
             "created_at": r.created_at,
+            "patient_id": r.patient_id,
         }
         for r in records
     ]
