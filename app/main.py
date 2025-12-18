@@ -378,7 +378,7 @@ def healthai_predict(
     }
 
 
-@app.post("/healthai/verify/{prediction_id}")
+@app.patch("/healthai/verify/{prediction_id}")
 def verify_ai_prediction(
     prediction_id: str,
     user=Depends(require_role("DOCTOR")),
@@ -394,4 +394,15 @@ def verify_ai_prediction(
     prediction.doctor_verified = "YES"
     db.commit()
 
-    return {"message": "AI prediction verified by doctor"}
+    return {"message": "Prediction verified by doctor"}
+
+@app.get("/healthai/pending")
+def get_pending_predictions(
+    user=Depends(require_role("DOCTOR")),
+    db: Session = Depends(get_db)
+):
+    predictions = db.query(AIPrediction).filter(
+        AIPrediction.doctor_verified == "NO"
+    ).all()
+
+    return predictions
