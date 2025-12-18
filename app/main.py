@@ -413,8 +413,54 @@ def get_pending_predictions(
     user=Depends(require_role("DOCTOR")),
     db: Session = Depends(get_db)
 ):
-    predictions = db.query(AIPrediction).filter(
-        AIPrediction.doctor_verified == "NO"
-    ).all()
+    predictions = (
+        db.query(AIPrediction)
+        .filter(AIPrediction.doctor_verified == "PENDING")
+        .all()
+    )
 
-    return predictions
+    response = []
+    for p in predictions:
+        response.append({
+            "prediction_id": p.id,
+            "image_path": p.image_path,
+            "created_at": p.created_at,
+            "results": [
+                {
+                    "disease": r.disease_name,
+                    "confidence": float(r.confidence_score)
+                }
+                for r in p.results
+            ]
+        })
+
+    return response
+
+@app.post("/healthai/verify/{prediction_id}")
+def verify_prediction(
+    prediction_id: str,
+    action: str,  # VERIFIED or REJECTED
+    user=Depends(require_role("DOCTOR")),
+    db: Session = Depends(get_db)
+):
+    if action not in ["VERIFIED", "REJECTED"]:
+        raise HTTPException(status_code=400, detail="Invalid action")
+
+    prediction = db.query(AIPrediction).filter(
+        AIPrediction.id == prediction_id
+    ).first()
+
+    if not prediction:
+        raise HTTPException(status_code=404, detail="Prediction not found")
+
+    prediction.doctor_verified = action
+    prediction.verified_by = user["sub"]
+    prediction.verified_at = datetime.utcnow()
+
+    db.commit()
+
+    return {
+        "message": f"Prediction {action.lower()} successfully"
+    }
+
+

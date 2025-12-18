@@ -112,10 +112,17 @@ class AIPrediction(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     patient_id = Column(String, ForeignKey("patients.id"), nullable=False)
     image_path = Column(String, nullable=False)
-    doctor_verified = Column(String, default="NO")  # YES / NO
+
+    doctor_verified = Column(String, default="PENDING")  
+    # PENDING | VERIFIED | REJECTED
+
+    verified_by = Column(String, ForeignKey("users.id"), nullable=True)
+    verified_at = Column(DateTime, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
 
     results = relationship("AIPredictionResult", back_populates="prediction")
+
 
 
 class AIPredictionResult(Base):
