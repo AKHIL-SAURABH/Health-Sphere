@@ -584,8 +584,61 @@ def admin_stats(
         "total_users": db.query(User).count(),
         "patients": db.query(User).filter(User.role == "PATIENT").count(),
         "doctors": db.query(User).filter(User.role == "DOCTOR").count(),
+
+        "medvault_records": db.query(MedicalRecord).count(),
+
         "ai_predictions": db.query(AIPrediction).count(),
+        "pending_predictions": db.query(AIPrediction)
+            .filter(AIPrediction.doctor_verified == "NO")
+            .count(),
         "verified_predictions": db.query(AIPrediction)
             .filter(AIPrediction.doctor_verified == "VERIFIED")
-            .count()
+            .count(),
+        "rejected_predictions": db.query(AIPrediction)
+            .filter(AIPrediction.doctor_verified == "REJECTED")
+            .count(),
     }
+
+@app.get("/admin/recent/healthai")
+def recent_healthai_activity(
+    admin=Depends(require_role("ADMIN")),
+    db: Session = Depends(get_db)
+):
+    records = (
+        db.query(AIPrediction)
+        .order_by(AIPrediction.created_at.desc())
+        .limit(10)
+        .all()
+    )
+
+    return [
+        {
+            "prediction_id": r.id,
+            "patient_id": r.patient_id,
+            "status": r.doctor_verified,
+            "created_at": r.created_at
+        }
+        for r in records
+    ]
+
+@app.get("/admin/recent/medvault")
+def recent_medvault_activity(
+    admin=Depends(require_role("ADMIN")),
+    db: Session = Depends(get_db)
+):
+    records = (
+        db.query(MedicalRecord)
+        .order_by(MedicalRecord.created_at.desc())
+        .limit(10)
+        .all()
+    )
+
+    return [
+        {
+            "record_id": r.id,
+            "patient_id": r.patient_id,
+            "record_type": r.record_type,
+            "created_at": r.created_at
+        }
+        for r in records
+    ]
