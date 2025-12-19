@@ -543,6 +543,10 @@ def get_my_healthai_predictions(
                 }
                 for r in p.results
             ],
+            "doctor_verified": p.doctor_verified,
+            "doctor_notes": p.doctor_notes,          
+            "verified_by": p.verified_by,             
+            "verified_at": p.verified_at, 
             "created_at": p.created_at
         })
 
@@ -593,7 +597,7 @@ def admin_stats(
             .filter(AIPrediction.doctor_verified == "NO")
             .count(),
         "verified_predictions": db.query(AIPrediction)
-            .filter(AIPrediction.doctor_verified == "VERIFIED")
+            .filter(AIPrediction.doctor_verified.in_(["VERIFIED", "YES"]))
             .count(),
         "rejected_predictions": db.query(AIPrediction)
             .filter(AIPrediction.doctor_verified == "REJECTED")
