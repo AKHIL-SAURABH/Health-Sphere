@@ -50,6 +50,7 @@ from .database import get_db
 from .auth import hash_password
 from .core.security import get_current_user
 from typing import List
+from sqlalchemy import func
 
 
 
@@ -641,4 +642,122 @@ def recent_medvault_activity(
             "created_at": r.created_at
         }
         for r in records
+    ]
+
+
+@app.get("/admin/analytics/healthai/daily")
+def healthai_daily_trends(
+    admin=Depends(require_role("ADMIN")),
+    db: Session = Depends(get_db)
+):
+    data = (
+        db.query(
+            func.date(AIPrediction.created_at).label("date"),
+            func.count().label("count")
+        )
+        .group_by(func.date(AIPrediction.created_at))
+        .order_by(func.date(AIPrediction.created_at))
+        .all()
+    )
+
+    return [
+        {"date": str(d.date), "count": d.count}
+        for d in data
+    ]
+
+@app.get("/admin/analytics/healthai/status")
+def healthai_status_distribution(
+    admin=Depends(require_role("ADMIN")),
+    db: Session = Depends(get_db)
+):
+    data = (
+        db.query(
+            AIPrediction.doctor_verified,
+            func.count().label("count")
+        )
+        .group_by(AIPrediction.doctor_verified)
+        .all()
+    )
+
+    return [
+        {"status": s.doctor_verified, "count": s.count}
+        for s in data
+    ]
+
+@app.get("/admin/analytics/medvault/daily")
+def medvault_daily_uploads(
+    admin=Depends(require_role("ADMIN")),
+    db: Session = Depends(get_db)
+):
+    data = (
+        db.query(
+            func.date(MedicalRecord.created_at).label("date"),
+            func.count().label("count")
+        )
+        .group_by(func.date(MedicalRecord.created_at))
+        .order_by(func.date(MedicalRecord.created_at))
+        .all()
+    )
+
+    return [
+        {"date": str(d.date), "count": d.count}
+        for d in data
+    ]
+
+@app.get("/admin/analytics/medvault/types")
+def medvault_type_distribution(
+    admin=Depends(require_role("ADMIN")),
+    db: Session = Depends(get_db)
+):
+    data = (
+        db.query(
+            MedicalRecord.record_type,
+            func.count().label("count")
+        )
+        .group_by(MedicalRecord.record_type)
+        .all()
+    )
+
+    return [
+        {"type": r.record_type, "count": r.count}
+        for r in data
+    ]
+
+@app.get("/admin/analytics/users/roles")
+def user_role_distribution(
+    admin=Depends(require_role("ADMIN")),
+    db: Session = Depends(get_db)
+):
+    data = (
+        db.query(
+            User.role,
+            func.count().label("count")
+        )
+        .group_by(User.role)
+        .all()
+    )
+
+    return [
+        {"role": r.role, "count": r.count}
+        for r in data
+    ]
+
+@app.get("/admin/analytics/users/daily")
+def user_growth_daily(
+    admin=Depends(require_role("ADMIN")),
+    db: Session = Depends(get_db)
+):
+    data = (
+        db.query(
+            func.date(User.created_at).label("date"),
+            func.count().label("count")
+        )
+        .group_by(func.date(User.created_at))
+        .order_by(func.date(User.created_at))
+        .all()
+    )
+
+    return [
+        {"date": str(d.date), "count": d.count}
+        for d in data
     ]
