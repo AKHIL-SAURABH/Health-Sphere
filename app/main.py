@@ -227,6 +227,16 @@ def update_user_role(
         raise HTTPException(status_code=404, detail="User not found")
 
     user.role = role
+    # ✅ CREATE DOCTOR PROFILE IF ROLE = DOCTOR
+    if role == "DOCTOR":
+        existing = db.query(Doctor).filter(Doctor.user_id == user.id).first()
+        if not existing:
+            doctor = Doctor(
+                user_id=user.id,
+                specialization="GENERAL",
+                experience_years="0"
+            )
+            db.add(doctor)
     db.commit()
 
     return {"message": f"Role updated to {role}"}
