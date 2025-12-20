@@ -28,6 +28,12 @@ from .schemas import (
     MedicalRecordResponse
 )
 
+from sqlalchemy.orm import Session
+from fastapi import Depends
+from app.models import Doctor, User
+from app.database import get_db
+
+
 from .core.security import require_role
 from datetime import datetime
 import uuid
@@ -225,6 +231,24 @@ def update_user_role(
 
     return {"message": f"Role updated to {role}"}
 
+@app.get("/doctors")
+def list_doctors(db: Session = Depends(get_db)):
+    doctors = (
+        db.query(Doctor, User)
+        .join(User, Doctor.user_id == User.id)
+        .filter(User.role == "DOCTOR")
+        .all()
+    )
+
+    return [
+        {
+            "doctor_id": d.Doctor.id,
+            "name": d.User.name,
+            "specialization": d.Doctor.specialization,
+            "availability_status": d.Doctor.availability_status,
+        }
+        for d in doctors
+    ]
 
 # @app.post("/appointments/book")
 # def book_appointment(
