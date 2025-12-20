@@ -375,20 +375,20 @@ def doctor_view_records(
     ]
 
 
-@app.post("/admin/bed-status")
-def update_bed_status(
-    data: BedStatusCreate,
-    user=Depends(require_role("ADMIN")),
-    db: Session = Depends(get_db)
-):
-    bed = BedStatus(
-        hospital_name=data.hospital_name,
-        total_beds=data.total_beds,
-        available_beds=data.available_beds
-    )
-    db.add(bed)
-    db.commit()
-    return {"message": "Bed status updated"}
+# @app.post("/admin/bed-status")
+# def update_bed_status(
+#     data: BedStatusCreate,
+#     user=Depends(require_role("ADMIN")),
+#     db: Session = Depends(get_db)
+# ):
+#     bed = BedStatus(
+#         hospital_name=data.hospital_name,
+#         total_beds=data.total_beds,
+#         available_beds=data.available_beds
+#     )
+#     db.add(bed)
+#     db.commit()
+#     return {"message": "Bed status updated"}
 
 @app.post("/medislot/appointments")
 def book_appointment(
@@ -917,3 +917,166 @@ def user_growth_daily(
     ]
 
 
+@app.post("/medislot/beds")
+def add_bed(
+    ward: str,
+    bed_number: str,
+    admin=Depends(require_role("ADMIN")),
+    db: Session = Depends(get_db)
+):
+    bed = Bed(
+        ward=ward,
+        bed_number=bed_number,
+        is_available=True
+    )
+    db.add(bed)
+    db.commit()
+    db.refresh(bed)
+
+    return {
+        "id": bed.id,
+        "ward": bed.ward,
+        "bed_number": bed.bed_number,
+        "is_available": bed.is_available
+    }
+
+
+
+@app.get("/medislot/beds")
+def list_beds(db: Session = Depends(get_db)):
+    beds = db.query(Bed).all()
+
+    return [
+        {
+            "bed_id": b.id,
+            "ward": b.ward,
+            "bed_number": b.bed_number,
+            "is_available": b.is_available,
+            "created_at": b.created_at
+        }
+        for b in beds
+    ]
+
+# @app.get("/medislot/beds")
+# def view_all_beds(
+#     admin=Depends(require_role("ADMIN")),
+#     db: Session = Depends(get_db)
+# ):
+#     beds = db.query(Bed).all()
+
+#     return [
+#         {
+#             "bed_id": b.id,
+#             "ward": b.ward,
+#             "bed_number": b.bed_number,
+#             "is_available": b.is_available
+#         }
+#         for b in beds
+#     ]
+
+
+@app.post("/medislot/beds/{bed_id}/allocate")
+def allocate_bed(
+    bed_id: str,
+    patient_user_id: str,
+    admin=Depends(require_role("ADMIN")),
+    db: Session = Depends(get_db)
+):
+    bed = db.query(Bed).filter(Bed.id == bed_id).first()
+    if not bed or not bed.is_available:
+        raise HTTPException(status_code=400, detail="Bed not available")
+
+    patient = db.query(Patient).filter(
+        Patient.user_id == patient_user_id
+    ).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    allocation = BedAllocation(
+        patient_id=patient.user_id,
+        bed_id=bed.id,
+        status="ACTIVE"
+    )
+
+    bed.is_available = False
+
+    db.add(allocation)
+    db.commit()
+
+    return {
+        "message": "Bed allocated successfully",
+        "bed_id": bed.id,
+        "patient_id": patient.user_id
+    }
+
+
+@app.post("/medislot/beds/{bed_id}/release")
+def release_bed(
+    bed_id: str,
+    admin=Depends(require_role("ADMIN")),
+    db: Session = Depends(get_db)
+):
+    allocation = db.query(BedAllocation).filter(
+        BedAllocation.bed_id == bed_id,
+        BedAllocation.status == "ACTIVE"
+    ).first()
+
+    if not allocation:
+        raise HTTPException(status_code=404, detail="No active allocation")
+
+    bed = db.query(Bed).filter(Bed.id == bed_id).first()
+
+    allocation.status = "RELEASED"
+    allocation.released_at = datetime.utcnow()
+    bed.is_available = True
+
+    db.commit()
+
+    return {"message": "Bed released successfully"}
+
+
+
+@app.get("/medislot/beds/allocations")
+def all_bed_allocations(
+    admin=Depends(require_role("ADMIN")),
+    db: Session = Depends(get_db)
+):
+    allocations = db.query(BedAllocation).all()
+
+    return [
+        {
+            "allocation_id": a.id,
+            "patient_id": a.patient_id,
+            "bed_id": a.bed_id,
+            "status": a.status,
+            "allocated_at": a.allocated_at,
+            "released_at": a.released_at
+        }
+        for a in allocations
+    ]
+
+
+
+@app.get("/medislot/my-bed")
+def my_bed(
+    user=Depends(require_role("PATIENT")),
+    db: Session = Depends(get_db)
+):
+    allocation = db.query(BedAllocation).filter(
+        BedAllocation.patient_id == user["sub"],
+        BedAllocation.status == "ACTIVE"
+    ).first()
+
+    if not allocation:
+        return {"allocated": False}
+
+    bed = db.query(Bed).filter(Bed.id == allocation.bed_id).first()
+
+    return {
+        "allocated": True,
+        "bed": {
+            "ward": bed.ward,
+            "bed_number": bed.bed_number
+        },
+        "allocated_at": allocation.allocated_at
+    }
