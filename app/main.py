@@ -233,8 +233,9 @@ def update_user_role(
         if not existing:
             doctor = Doctor(
                 user_id=user.id,
-                specialization="GENERAL",
-                experience_years="0"
+                specialization=None,
+                experience_years=None,
+                availability_status="AVAILABLE"
             )
             db.add(doctor)
     db.commit()
