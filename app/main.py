@@ -398,22 +398,10 @@ def book_appointment(
     user=Depends(require_role("PATIENT")),
     db: Session = Depends(get_db)
 ):
-    patient = db.query(Patient).filter(
-        Patient.user_id == user["sub"]
-    ).first()
-    if not patient:
-        raise HTTPException(status_code=400, detail="Patient profile not found")
-
-    doctor = db.query(Doctor).filter(
-        Doctor.id == doctor_id
-    ).first()
-    if not doctor:
-        raise HTTPException(status_code=400, detail="Doctor not found")
-
-    # 🚫 Prevent duplicate pending appointment
+    # 🔒 Prevent duplicate pending bookings
     existing = db.query(Appointment).filter(
-        Appointment.patient_id == patient.id,
-        Appointment.doctor_id == doctor.id,
+        Appointment.patient_id == user["sub"],
+        Appointment.doctor_id == doctor_id,
         Appointment.status == "PENDING"
     ).first()
 
@@ -424,8 +412,8 @@ def book_appointment(
         )
 
     appointment = Appointment(
-        patient_id=patient.id,
-        doctor_id=doctor.id,
+        patient_id=user["sub"],
+        doctor_id=doctor_id,
         appointment_date=appointment_date,
         appointment_time=appointment_time,
         status="PENDING"
@@ -435,6 +423,7 @@ def book_appointment(
     db.commit()
 
     return {"message": "Appointment booked successfully"}
+
 
 
 @app.get("/medislot/my-appointments")
