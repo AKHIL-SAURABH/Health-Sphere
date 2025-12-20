@@ -1,9 +1,12 @@
-from sqlalchemy import Column, String, DateTime, ForeignKey
+from sqlalchemy import Column, String, DateTime, ForeignKey, Date, Time, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
+from datetime import datetime, date, time
+
 
 from .database import Base
+
 
 
 # =========================
@@ -59,21 +62,66 @@ class Doctor(Base):
 
 
 # =========================
-# APPOINTMENT
+# APPOINTMENT (MediSlot)
 # =========================
 class Appointment(Base):
     __tablename__ = "appointments"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+
     patient_id = Column(String, ForeignKey("patients.id"), nullable=False)
     doctor_id = Column(String, ForeignKey("doctors.id"), nullable=False)
 
-    appointment_date = Column(DateTime, nullable=False)
-    status = Column(String, default="BOOKED")
+    appointment_date = Column(Date, nullable=False)
+    appointment_time = Column(Time, nullable=False)
+
+    status = Column(String, default="PENDING")  
+    # PENDING | APPROVED | COMPLETED | CANCELLED
+
+    notes = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     patient = relationship("Patient", back_populates="appointments")
     doctor = relationship("Doctor", back_populates="appointments")
+
+
+# =========================
+# BED MANAGEMENT (MediSlot)
+# =========================
+class Bed(Base):
+    __tablename__ = "beds"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    ward = Column(String, nullable=False)
+    bed_number = Column(String, nullable=False)
+
+    is_available = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class BedAllocation(Base):
+    __tablename__ = "bed_allocations"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+
+    patient_id = Column(String, ForeignKey("users.id"), nullable=False)
+    bed_id = Column(String, ForeignKey("beds.id"), nullable=False)
+
+    allocated_at = Column(DateTime, default=datetime.utcnow)
+    released_at = Column(DateTime, nullable=True)
+
+    status = Column(String, default="ACTIVE")  
+    # ACTIVE | RELEASED
+
+
+class BedStatus(Base):
+    __tablename__ = "bed_status"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    hospital_name = Column(String, nullable=False)
+    total_beds = Column(String, nullable=False)
+    available_beds = Column(String, nullable=False)
+    last_updated = Column(DateTime, default=datetime.utcnow)
 
 
 # =========================
@@ -93,14 +141,7 @@ class MedicalRecord(Base):
 
     patient = relationship("Patient", back_populates="records")
 
-class BedStatus(Base):
-    __tablename__ = "bed_status"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    hospital_name = Column(String, nullable=False)
-    total_beds = Column(String, nullable=False)
-    available_beds = Column(String, nullable=False)
-    last_updated = Column(DateTime, default=datetime.utcnow)
 
 
 # =========================

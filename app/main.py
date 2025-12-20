@@ -31,8 +31,8 @@ from .schemas import (
 from .core.security import require_role
 from datetime import datetime
 import uuid
-
-from .models import BedStatus
+from datetime import datetime, date, time
+from .models import Appointment, Bed, BedAllocation, BedStatus
 from .schemas import BedStatusCreate
 
 
@@ -226,24 +226,24 @@ def update_user_role(
     return {"message": f"Role updated to {role}"}
 
 
-@app.post("/appointments/book")
-def book_appointment(
-    data: AppointmentCreate,
-    user=Depends(require_role("PATIENT")),
-    db: Session = Depends(get_db)
-):
-    patient = db.query(Patient).filter(Patient.user_id == user["sub"]).first()
-    if not patient:
-        raise HTTPException(status_code=400, detail="Patient profile not found")
+# @app.post("/appointments/book")
+# def book_appointment(
+#     data: AppointmentCreate,
+#     user=Depends(require_role("PATIENT")),
+#     db: Session = Depends(get_db)
+# ):
+#     patient = db.query(Patient).filter(Patient.user_id == user["sub"]).first()
+#     if not patient:
+#         raise HTTPException(status_code=400, detail="Patient profile not found")
 
-    appointment = Appointment(
-        patient_id=patient.id,
-        doctor_id=data.doctor_id,
-        appointment_date=data.appointment_date
-    )
-    db.add(appointment)
-    db.commit()
-    return {"message": "Appointment booked"}
+#     appointment = Appointment(
+#         patient_id=patient.id,
+#         doctor_id=data.doctor_id,
+#         appointment_date=data.appointment_date
+#     )
+#     db.add(appointment)
+#     db.commit()
+#     return {"message": "Appointment booked"}
 
 
 @app.post("/medvault/upload")
@@ -350,23 +350,104 @@ def update_bed_status(
     db.commit()
     return {"message": "Bed status updated"}
 
-@app.get("/beds")
-def get_bed_status(db: Session = Depends(get_db)):
-    return db.query(BedStatus).all()
+@app.post("/medislot/appointments")
+def book_appointment(
+    appointment_date: date,
+    appointment_time: time,
+    doctor_id: str,
+    user=Depends(require_role("PATIENT")),
+    db: Session = Depends(get_db)
+):
+    appointment = Appointment(
+        patient_id=user["sub"],
+        doctor_id=doctor_id,
+        appointment_date=appointment_date,
+        appointment_time=appointment_time
+    )
+
+    db.add(appointment)
+    db.commit()
+
+    return {"message": "Appointment booked successfully"}
 
 
-@app.get("/doctors/appointments")
-def get_doctor_appointments(
+@app.get("/medislot/my-appointments")
+def my_appointments(
+    user=Depends(require_role("PATIENT")),
+    db: Session = Depends(get_db)
+):
+    return db.query(Appointment).filter(
+        Appointment.patient_id == user["sub"]
+    ).all()
+
+@app.get("/medislot/doctor/appointments")
+def doctor_appointments(
     user=Depends(require_role("DOCTOR")),
     db: Session = Depends(get_db)
 ):
-    doctor = db.query(Doctor).filter(Doctor.user_id == user["sub"]).first()
-    if not doctor:
-        raise HTTPException(status_code=400, detail="Doctor profile not found")
-
     return db.query(Appointment).filter(
-        Appointment.doctor_id == doctor.id
+        Appointment.doctor_id == user["sub"]
     ).all()
+
+
+@app.post("/medislot/appointments/{appointment_id}/status")
+def update_appointment_status(
+    appointment_id: str,
+    status: str,
+    user=Depends(require_role("DOCTOR")),
+    db: Session = Depends(get_db)
+):
+    appointment = db.query(Appointment).filter(
+        Appointment.id == appointment_id
+    ).first()
+
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+
+    appointment.status = status
+    db.commit()
+
+    return {"message": "Status updated"}
+
+
+@app.post("/medislot/beds")
+def add_bed(
+    ward: str,
+    bed_number: str,
+    admin=Depends(require_role("ADMIN")),
+    db: Session = Depends(get_db)
+):
+    bed = Bed(ward=ward, bed_number=bed_number)
+    db.add(bed)
+    db.commit()
+
+    return {"message": "Bed added"}
+
+@app.get("/medislot/beds")
+def view_beds(
+    admin=Depends(require_role("ADMIN")),
+    db: Session = Depends(get_db)
+):
+    return db.query(Bed).all()
+
+
+# @app.get("/beds")
+# def get_bed_status(db: Session = Depends(get_db)):
+#     return db.query(BedStatus).all()
+
+
+# @app.get("/doctors/appointments")
+# def get_doctor_appointments(
+#     user=Depends(require_role("DOCTOR")),
+#     db: Session = Depends(get_db)
+# ):
+#     doctor = db.query(Doctor).filter(Doctor.user_id == user["sub"]).first()
+#     if not doctor:
+#         raise HTTPException(status_code=400, detail="Doctor profile not found")
+
+#     return db.query(Appointment).filter(
+#         Appointment.doctor_id == doctor.id
+#     ).all()
 
 
 @app.post("/healthai/predict", response_model=AIPredictionResponse)
@@ -765,3 +846,5 @@ def user_growth_daily(
         {"date": str(d.date), "count": d.count}
         for d in data
     ]
+
+
