@@ -246,19 +246,21 @@ def list_doctors(db: Session = Depends(get_db)):
     doctors = (
         db.query(Doctor, User)
         .join(User, Doctor.user_id == User.id)
-        .filter(User.role == "DOCTOR")
         .all()
     )
 
     return [
         {
-            "doctor_id": d.Doctor.id,
-            "name": d.User.name,
-            "specialization": d.Doctor.specialization,
-            "availability_status": d.Doctor.availability_status,
+            "doctor_id": d.id,
+            "name": u.name,
+            "email": u.email,
+            "specialization": d.specialization,
+            "experience_years": d.experience_years,
+            "availability_status": d.availability_status
         }
-        for d in doctors
+        for d, u in doctors
     ]
+
 
 # @app.post("/appointments/book")
 # def book_appointment(
