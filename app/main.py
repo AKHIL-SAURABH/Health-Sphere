@@ -93,11 +93,9 @@ def get_db():
 
 @app.post("/auth/register")
 def register(user: UserCreate, db: Session = Depends(get_db)):
-    # 1️⃣ Check if email already exists
     if db.query(User).filter(User.email == user.email).first():
         raise HTTPException(status_code=400, detail="Email already exists")
 
-    # 2️⃣ Create user
     new_user = User(
         name=user.name,
         email=user.email,
@@ -106,21 +104,25 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     )
     db.add(new_user)
     db.commit()
-    db.refresh(new_user)   # ✅ user.id now exists
+    db.refresh(new_user)
 
-    # 3️⃣ AUTO-CREATE PATIENT PROFILE (IMPORTANT)
+    # ✅ AUTO-CREATE PROFILES
     if new_user.role == "PATIENT":
-        patient = Patient(
-            user_id=new_user.id,
-            age="",
-            gender="",
-            contact_number=""
-        )
-        db.add(patient)
-        db.commit()
+        db.add(Patient(user_id=new_user.id))
 
-    # 4️⃣ Return response
+    if new_user.role == "DOCTOR":
+        db.add(
+            Doctor(
+                user_id=new_user.id,
+                specialization="",
+                experience_years="",
+                availability_status="AVAILABLE"
+            )
+        )
+
+    db.commit()
     return {"message": "User registered successfully"}
+
 
 
 @app.post("/auth/login", response_model=Token)
@@ -247,6 +249,7 @@ def list_doctors(db: Session = Depends(get_db)):
     doctors = (
         db.query(Doctor, User)
         .join(User, Doctor.user_id == User.id)
+        .filter(Doctor.specialization.isnot(None))
         .all()
     )
 
