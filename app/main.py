@@ -398,11 +398,37 @@ def book_appointment(
     user=Depends(require_role("PATIENT")),
     db: Session = Depends(get_db)
 ):
+    patient = db.query(Patient).filter(
+        Patient.user_id == user["sub"]
+    ).first()
+    if not patient:
+        raise HTTPException(status_code=400, detail="Patient profile not found")
+
+    doctor = db.query(Doctor).filter(
+        Doctor.id == doctor_id
+    ).first()
+    if not doctor:
+        raise HTTPException(status_code=400, detail="Doctor not found")
+
+    # 🚫 Prevent duplicate pending appointment
+    existing = db.query(Appointment).filter(
+        Appointment.patient_id == patient.id,
+        Appointment.doctor_id == doctor.id,
+        Appointment.status == "PENDING"
+    ).first()
+
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail="You already have a pending appointment with this doctor"
+        )
+
     appointment = Appointment(
-        patient_id=user["sub"],
-        doctor_id=doctor_id,
+        patient_id=patient.id,
+        doctor_id=doctor.id,
         appointment_date=appointment_date,
-        appointment_time=appointment_time
+        appointment_time=appointment_time,
+        status="PENDING"
     )
 
     db.add(appointment)
@@ -416,18 +442,32 @@ def my_appointments(
     user=Depends(require_role("PATIENT")),
     db: Session = Depends(get_db)
 ):
+    patient = db.query(Patient).filter(
+        Patient.user_id == user["sub"]
+    ).first()
+
+    if not patient:
+        raise HTTPException(status_code=400, detail="Patient profile not found")
+
     return db.query(Appointment).filter(
-        Appointment.patient_id == user["sub"]
-    ).all()
+        Appointment.patient_id == patient.id
+    ).order_by(Appointment.created_at.desc()).all()
 
 @app.get("/medislot/doctor/appointments")
 def doctor_appointments(
     user=Depends(require_role("DOCTOR")),
     db: Session = Depends(get_db)
 ):
+    doctor = db.query(Doctor).filter(
+        Doctor.user_id == user["sub"]
+    ).first()
+
+    if not doctor:
+        raise HTTPException(status_code=400, detail="Doctor profile not found")
+
     return db.query(Appointment).filter(
-        Appointment.doctor_id == user["sub"]
-    ).all()
+        Appointment.doctor_id == doctor.id
+    ).order_by(Appointment.created_at.desc()).all()
 
 
 @app.post("/medislot/appointments/{appointment_id}/status")
