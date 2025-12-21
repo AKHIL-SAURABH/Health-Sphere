@@ -68,7 +68,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",              # local frontend
-        "https://health-sphere-c2a3.onrender.com",  # backend itself
+        "https://health-sphere-c2a3.onrender.com",
+        "https://health-sphere-frontend-eight.vercel.app",
+        "https://health-sphere-frontend-i72gecyyw-akhil-saurabhs-projects.vercel.app"
         # you can add vercel URL later
     ],
     allow_credentials=True,
