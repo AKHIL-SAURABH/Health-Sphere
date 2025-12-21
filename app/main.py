@@ -489,6 +489,30 @@ def update_appointment_status(
     return {"message": f"Appointment {status.lower()}"}
 
 
+@app.post("/medislot/appointments/{appointment_id}/cancel")
+def cancel_appointment(
+    appointment_id: str,
+    user=Depends(require_role("PATIENT")),
+    db: Session = Depends(get_db)
+):
+    patient = db.query(Patient).filter(
+        Patient.user_id == user["sub"]
+    ).first()
+
+    appointment = db.query(Appointment).filter(
+        Appointment.id == appointment_id,
+        Appointment.patient_id == patient.id,
+        Appointment.status == "PENDING"
+    ).first()
+
+    if not appointment:
+        raise HTTPException(404, "Appointment not found")
+
+    appointment.status = "CANCELLED"
+    db.commit()
+
+    return {"message": "Appointment cancelled"}
+
 
 
 @app.post("/healthai/predict", response_model=AIPredictionResponse)
