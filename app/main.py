@@ -375,21 +375,6 @@ def doctor_view_records(
     ]
 
 
-# @app.post("/admin/bed-status")
-# def update_bed_status(
-#     data: BedStatusCreate,
-#     user=Depends(require_role("ADMIN")),
-#     db: Session = Depends(get_db)
-# ):
-#     bed = BedStatus(
-#         hospital_name=data.hospital_name,
-#         total_beds=data.total_beds,
-#         available_beds=data.available_beds
-#     )
-#     db.add(bed)
-#     db.commit()
-#     return {"message": "Bed status updated"}
-
 @app.post("/medislot/appointments")
 def book_appointment(
     appointment_date: date,
@@ -398,21 +383,27 @@ def book_appointment(
     user=Depends(require_role("PATIENT")),
     db: Session = Depends(get_db)
 ):
-    # 🔒 Prevent duplicate pending bookings
+    patient = db.query(Patient).filter(
+        Patient.user_id == user["sub"]
+    ).first()
+
+    if not patient:
+        raise HTTPException(400, "Patient profile not found")
+
     existing = db.query(Appointment).filter(
-        Appointment.patient_id == user["sub"],
+        Appointment.patient_id == patient.id,
         Appointment.doctor_id == doctor_id,
-        Appointment.status == "PENDING"
+        Appointment.status.in_(["PENDING", "APPROVED"])
     ).first()
 
     if existing:
         raise HTTPException(
-            status_code=400,
-            detail="You already have a pending appointment with this doctor"
+            400,
+            "You already have an active appointment with this doctor"
         )
 
     appointment = Appointment(
-        patient_id=user["sub"],
+        patient_id=patient.id,
         doctor_id=doctor_id,
         appointment_date=appointment_date,
         appointment_time=appointment_time,
@@ -421,8 +412,14 @@ def book_appointment(
 
     db.add(appointment)
     db.commit()
+    db.refresh(appointment)
 
-    return {"message": "Appointment booked successfully"}
+    return {
+        "message": "Appointment request sent",
+        "appointment_id": appointment.id,
+        "status": appointment.status
+    }
+
 
 
 
@@ -441,6 +438,8 @@ def my_appointments(
     return db.query(Appointment).filter(
         Appointment.patient_id == patient.id
     ).order_by(Appointment.created_at.desc()).all()
+
+
 
 @app.get("/medislot/doctor/appointments")
 def doctor_appointments(
@@ -466,32 +465,30 @@ def update_appointment_status(
     user=Depends(require_role("DOCTOR")),
     db: Session = Depends(get_db)
 ):
+    doctor = db.query(Doctor).filter(
+        Doctor.user_id == user["sub"]
+    ).first()
+
+    if not doctor:
+        raise HTTPException(400, "Doctor profile not found")
+
     appointment = db.query(Appointment).filter(
-        Appointment.id == appointment_id
+        Appointment.id == appointment_id,
+        Appointment.doctor_id == doctor.id
     ).first()
 
     if not appointment:
-        raise HTTPException(status_code=404, detail="Appointment not found")
+        raise HTTPException(404, "Appointment not found")
+
+    if status not in ["APPROVED", "CANCELLED", "COMPLETED"]:
+        raise HTTPException(400, "Invalid status")
 
     appointment.status = status
     db.commit()
 
-    return {"message": "Status updated"}
+    return {"message": f"Appointment {status.lower()}"}
 
 
-
-# @app.get("/doctors/appointments")
-# def get_doctor_appointments(
-#     user=Depends(require_role("DOCTOR")),
-#     db: Session = Depends(get_db)
-# ):
-#     doctor = db.query(Doctor).filter(Doctor.user_id == user["sub"]).first()
-#     if not doctor:
-#         raise HTTPException(status_code=400, detail="Doctor profile not found")
-
-#     return db.query(Appointment).filter(
-#         Appointment.doctor_id == doctor.id
-#     ).all()
 
 
 @app.post("/healthai/predict", response_model=AIPredictionResponse)
@@ -890,160 +887,6 @@ def user_growth_daily(
         {"date": str(d.date), "count": d.count}
         for d in data
     ]
-
-
-# #ADD BED (ADMIN ONLY)
-# @app.post("/admin/beds")
-# def add_bed(
-#     ward: str,
-#     bed_number: str,
-#     admin=Depends(require_role("ADMIN")),
-#     db: Session = Depends(get_db)
-# ):
-#     bed = Bed(
-#         ward=ward,
-#         bed_number=bed_number,
-#         is_available=True
-#     )
-#     db.add(bed)
-#     db.commit()
-#     db.refresh(bed)
-
-#     return {
-#         "id": bed.id,
-#         "ward": bed.ward,
-#         "bed_number": bed.bed_number,
-#         "is_available": bed.is_available
-#     }
-
-# #LIST BEDS (ADMIN ONLY)
-# @app.get("/admin/beds")
-# def list_beds(
-#     admin=Depends(require_role("ADMIN")),
-#     db: Session = Depends(get_db)
-# ):
-#     beds = db.query(Bed).all()
-#     return [
-#         {
-#             "id": b.id,
-#             "ward": b.ward,
-#             "bed_number": b.bed_number,
-#             "is_available": b.is_available,
-#             "created_at": b.created_at
-#         }
-#         for b in beds
-#     ]
-
-# # ALLOCATE BED (ADMIN ONLY)
-# @app.post("/admin/beds/{bed_id}/allocate")
-# def allocate_bed(
-#     bed_id: str,
-#     patient_id: str,
-#     admin=Depends(require_role("ADMIN")),
-#     db: Session = Depends(get_db)
-# ):
-#     bed = db.query(Bed).filter(
-#         Bed.id == bed_id,
-#         Bed.is_available == True
-#     ).first()
-
-#     if not bed:
-#         raise HTTPException(400, "Bed not available")
-
-#     allocation = BedAllocation(
-#         bed_id=bed.id,
-#         patient_id=patient_id
-#     )
-
-#     bed.is_available = False
-#     db.add(allocation)
-#     db.commit()
-
-#     return {"message": "Bed allocated"}
-
-
-# # RELEASE BED (ADMIN ONLY)
-# @app.post("/admin/beds/{bed_id}/release")
-# def release_bed(
-#     bed_id: str,
-#     admin=Depends(require_role("ADMIN")),
-#     db: Session = Depends(get_db)
-# ):
-#     allocation = (
-#         db.query(BedAllocation)
-#         .filter(
-#             BedAllocation.bed_id == bed_id,
-#             BedAllocation.status == "ACTIVE"
-#         )
-#         .first()
-#     )
-
-#     if not allocation:
-#         raise HTTPException(404, "Allocation not found")
-
-#     allocation.status = "RELEASED"
-#     allocation.released_at = datetime.utcnow()
-
-#     bed = db.query(Bed).filter(Bed.id == bed_id).first()
-#     bed.is_available = True
-
-#     db.commit()
-#     return {"message": "Bed released"}
-
-
-# #ALLOCATION HISTORY (ADMIN ONLY)
-# @app.get("/admin/bed-allocations")
-# def get_bed_allocations(
-#     admin=Depends(require_role("ADMIN")),
-#     db: Session = Depends(get_db)
-# ):
-#     allocations = (
-#         db.query(BedAllocation, Bed, User)
-#         .join(Bed, BedAllocation.bed_id == Bed.id)
-#         .join(User, BedAllocation.patient_id == User.id)
-#         .order_by(BedAllocation.allocated_at.desc())
-#         .all()
-#     )
-
-#     return [
-#         {
-#             "allocation_id": a.id,
-#             "patient_name": u.name,
-#             "ward": b.ward,
-#             "bed_number": b.bed_number,
-#             "status": a.status,
-#             "allocated_at": a.allocated_at,
-#             "released_at": a.released_at
-#         }
-#         for a, b, u in allocations
-#     ]
-
-
-# # PATIENT VIEW (MY BED)
-# @app.get("/patient/my-bed")
-# def my_bed(
-#     user=Depends(require_role("PATIENT")),
-#     db: Session = Depends(get_db)
-# ):
-#     allocation = (
-#         db.query(BedAllocation, Bed)
-#         .join(Bed, BedAllocation.bed_id == Bed.id)
-#         .filter(
-#             BedAllocation.patient_id == user["sub"],
-#             BedAllocation.status == "ACTIVE"
-#         )
-#         .first()
-#     )
-
-#     if not allocation:
-#         return {"message": "No bed allocated"}
-
-#     a, b = allocation
-#     return {
-#         "ward": b.ward,
-#         "bed_number": b.bed_number,
-#         "allocated_at": a.allocated_at
-#     }
 
 
 
