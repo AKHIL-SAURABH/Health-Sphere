@@ -1045,3 +1045,27 @@ def my_bed(
         "bed_number": b.bed_number,
         "allocated_at": a.allocated_at
     }
+
+#ADMIN: RELEASE BED ALLOCATION
+@app.post("/medislot/bed-allocations/{allocation_id}/release")
+def release_bed_allocation(
+    allocation_id: str,
+    admin=Depends(require_role("ADMIN")),
+    db: Session = Depends(get_db)
+):
+    allocation = db.query(BedAllocation).filter(
+        BedAllocation.id == allocation_id,
+        BedAllocation.status == "ACTIVE"
+    ).first()
+
+    if not allocation:
+        raise HTTPException(404, "Active allocation not found")
+
+    bed = db.query(Bed).filter(Bed.id == allocation.bed_id).first()
+
+    allocation.status = "RELEASED"
+    allocation.released_at = datetime.utcnow()
+    bed.is_available = True
+
+    db.commit()
+    return {"message": "Bed released successfully"}
