@@ -1,5 +1,7 @@
 # 🏥 HealthSphere — Backend API
 
+![HealthAI Banner](https://github.com/AKHIL-SAURABH/HealthAI-Project/blob/master/healthai.png?raw=true)
+
 HealthSphere Backend is a **production-ready FastAPI server** that powers the HealthSphere healthcare management platform.
 It handles **authentication, role-based access control, appointment scheduling (MediSlot), bed allocation, medical records (MedVault), HealthAI predictions, admin analytics, and audit logs**.
 
