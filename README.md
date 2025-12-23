@@ -16,7 +16,9 @@ This backend is **fully deployed on Render** and serves as the core API for the 
 
 * **Frontend Web App (Vercel):**
   👉 **Visit the frontend repository to access the live web app**
+  
   🔗 *Frontend Repository Link (Vercel-deployed)*
+  https://github.com/AKHIL-SAURABH/HealthSphere-Frontend
 
 > ⚠️ **Important:**
 > Users interact with HealthSphere via the **frontend web application**.
