@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 
 
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 load_dotenv()
@@ -81,6 +81,17 @@ app.add_middleware(
 
 os.makedirs("uploads", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "online",
+        "system": "HealthSphere"
+    }
+
+@app.head("/health")
+async def health_head():
+    return Response(status_code=200)
 
 
 def get_db():
